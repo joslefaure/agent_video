@@ -1,0 +1,68 @@
+# Core deep learning
+torch==2.5.1
+torchvision==0.20.1
+transformers==4.46.3
+accelerate==1.1.1
+safetensors==0.4.5
+
+# vLLM for efficient LLM inference
+vllm==0.6.4
+openai>=1.0.0  # for vLLM OpenAI-compatible API
+
+# Vision transformers and multimodal
+timm==1.0.11
+einops==0.8.0
+qwen-vl-utils==0.0.8  # For Qwen2.5-VL video/image processing
+
+# Video processing
+opencv-python==4.10.0.84
+opencv-contrib-python==4.10.0.84
+scenedetect[opencv]==0.6.4
+decord==0.6.0  # Fast video loading for InternVL/Qwen-VL
+av==13.1.0  # PyAV for video manipulation
+
+# OCR dependencies (for GOT-OCR2.0)
+tiktoken==0.8.0
+verovio==4.3.1
+
+# Audio processing (for ASR/speech detection)
+librosa==0.10.2.post1
+soundfile==0.12.1
+
+# Image processing
+pillow==11.0.0
+imageio==2.36.0
+scikit-image==0.24.0
+
+# Retrieval and indexing
+faiss-gpu==1.9.0  # Use faiss-cpu==1.9.0 if no GPU available
+numpy==1.26.4
+
+# Object detection
+ultralytics>=8.3.0  # YOLOv8+ for baseline detection
+# supervision  # Optional: for visualization
+
+# Utilities
+tqdm==4.67.1
+matplotlib==3.9.2
+seaborn==0.13.2
+
+# JSON schema and validation
+pydantic==2.10.3
+python-json-logger==3.2.1
+
+# Testing
+pytest==8.3.4
+pytest-cov==6.0.0
+pytest-mock==3.14.0
+
+# Hugging Face Hub
+huggingface-hub==0.26.5
+
+# Additional scientific computing
+scipy==1.14.1
+pandas==2.2.3
+
+# Tokenization
+sentencepiece==0.2.0
+protobuf==5.29.2
