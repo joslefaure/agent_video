@@ -1,0 +1,104 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Cache directories
+cache/
+.cache/
+__pycache__/
+
+# Model checkpoints and weights
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.ckpt
+*.h5
+*.pb
+
+# Large data files
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.wmv
+*.flv
+*.webm
+*.m4v
+*.mpg
+*.mpeg
+*.npy
+*.npz
+*.parquet
+*.arrow
+
+# Results and outputs
+results/
+outputs/
+logs/
+*.log
+*.json.bak
+*.csv
+wandb/
+mlruns/
+
+# Evaluation outputs
+videomme_results*.json
+test_*.json
+*_checkpoint_*.json
+
+# Temporary files
+*.tmp
+*.temp
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# OS files
+Thumbs.db
+.DS_Store
+
+# Ignore sample data (can be re-downloaded)
+sample_data/*.mp4
+sample_data/*.avi
+
+# Keep tiny sample for testing
+!sample_data/tiny_sample.mp4
