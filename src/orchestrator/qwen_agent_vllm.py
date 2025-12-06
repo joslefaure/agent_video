@@ -40,7 +40,7 @@ class QwenVideoAgentVLLM:
     
     def __init__(
         self,
-        model_name: str = "Qwen/Qwen2-VL-7B-Instruct",
+        model_name: str = "Qwen/Qwen3-VL-8B-Instruct",
         cache_dir: str = "./cache",
         device: Optional[str] = None,
         tensor_parallel_size: int = 1,
@@ -51,7 +51,7 @@ class QwenVideoAgentVLLM:
         Initialize the agent with vLLM.
         
         Args:
-            model_name: HuggingFace model ID (use Qwen2-VL for vLLM compatibility)
+            model_name: HuggingFace model ID (Qwen3-VL-8B-Instruct)
             cache_dir: Directory for caching intermediate results
             device: Device to use (auto-detected if None)
             tensor_parallel_size: Number of GPUs for tensor parallelism
@@ -86,13 +86,19 @@ class QwenVideoAgentVLLM:
         
         # Initialize vLLM
         logger.info("Loading vLLM model (this may take a few minutes)...")
+        
+        # Disable Triton for CUDA 13.0 / V100 compatibility
+        import os
+        os.environ['VLLM_USE_TRITON_FLASH_ATTN'] = '0'
+        
         self.llm = LLM(
             model=model_name,
             tensor_parallel_size=tensor_parallel_size,
             gpu_memory_utilization=gpu_memory_utilization,
             max_model_len=max_model_len,
             limit_mm_per_prompt={"image": 20},  # Allow up to 20 images per prompt
-            trust_remote_code=True
+            trust_remote_code=True,
+            disable_custom_all_reduce=True  # Disable custom kernels for compatibility
         )
         
         self.sampling_params = SamplingParams(

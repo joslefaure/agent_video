@@ -6,14 +6,18 @@ This agent orchestrates multiple perception tools to answer questions about vide
 It uses Qwen3-VL-8B-Instruct as the VLM backbone with tool-calling capabilities.
 """
 
+import os
 import json
 import logging
 from typing import List, Dict, Any, Optional
 from pathlib import Path
 import torch
-from transformers import AutoModelForVision2Seq, AutoProcessor
+from transformers import AutoModelForImageTextToText, AutoProcessor
 from qwen_vl_utils import process_vision_info
 import numpy as np
+
+# Set CUDA memory management for better fragmentation handling
+os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
 
 from tools.sampler import VideoSampler
 from tools.embedders import VisualEmbedder
@@ -81,17 +85,47 @@ class QwenVideoAgent:
         logger.info(f"Loading VLM: {self.model_name}")
         
         # Check available GPUs
-        if torch.cuda.is_available():
-            num_gpus = torch.cuda.device_count()
-            logger.info(f"Found {num_gpus} GPUs - will use automatic model parallelism")
+        num_gpus = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        logger.info(f"Found {num_gpus} GPU(s)")
         
-        self.model = AutoModel.from_pretrained(
+        # Determine device_map strategy
+        if num_gpus == 0:
+            device_map = None
+            dtype = torch.float32
+            use_flash_attn = False
+        elif num_gpus == 1:
+            # Single GPU: load directly on cuda:0 without device_map
+            device_map = None
+            dtype = torch.bfloat16
+            use_flash_attn = False  # Disable flash attention to save memory
+        else:
+            # Multiple GPUs: use auto device_map
+            device_map = "auto"
+            dtype = torch.bfloat16
+            use_flash_attn = False
+        
+        load_kwargs = {
+            "dtype": dtype,
+            "trust_remote_code": True,
+        }
+        
+        # Only add device_map and max_memory for multi-GPU
+        if device_map is not None:
+            load_kwargs["device_map"] = device_map
+            load_kwargs["max_memory"] = {i: "28GB" for i in range(num_gpus)}
+        
+        # Optional: flash attention (commented out to save memory)
+        # if use_flash_attn:
+        #     load_kwargs["attn_implementation"] = "flash_attention_2"
+        
+        self.model = AutoModelForImageTextToText.from_pretrained(
             self.model_name,
-            torch_dtype=torch.bfloat16 if self.device == "cuda" else torch.float32,
-            device_map="auto" if self.device == "cuda" else None,  # Auto-distributes across GPUs
-            trust_remote_code=True,
-            max_memory={i: "20GB" for i in range(torch.cuda.device_count())} if torch.cuda.is_available() else None  # Limit per-GPU memory
+            **load_kwargs
         )
+        
+        # Move to device if single GPU
+        if num_gpus == 1:
+            self.model = self.model.to(self.device)
         
         self.processor = AutoProcessor.from_pretrained(
             self.model_name,
@@ -202,7 +236,7 @@ class QwenVideoAgent:
     def generate_response(
         self,
         messages: List[Dict[str, Any]],
-        max_tokens: int = 512,
+        max_tokens: int = 128,
         temperature: float = 0.0
     ) -> str:
         """
@@ -226,7 +260,10 @@ class QwenVideoAgent:
             add_generation_prompt=True
         )
         
-        image_inputs, video_inputs = process_vision_info(messages)
+        # Use image_patch_size=16 for Qwen3-VL (14 for Qwen2.5-VL)
+        image_inputs, video_inputs = process_vision_info(
+            messages,
+        )
         
         inputs = self.processor(
             text=[text],
@@ -237,12 +274,11 @@ class QwenVideoAgent:
         )
         inputs = inputs.to(self.device)
         
-        # Generate
+        # Generate - only use supported parameters
         with torch.no_grad():
             output_ids = self.model.generate(
                 **inputs,
                 max_new_tokens=max_tokens,
-                temperature=temperature,
                 do_sample=temperature > 0
             )
         

@@ -100,7 +100,9 @@ def evaluate_videomme(
     max_samples: int = None,
     max_frames: int = 6,
     duration_filter: str = None,
-    checkpoint_every: int = 100
+    checkpoint_every: int = 100,
+    subset_fraction: float = None,
+    tensor_parallel_size: int = 1
 ):
     """
     Evaluate with vLLM batched inference.
@@ -115,9 +117,30 @@ def evaluate_videomme(
         max_frames: Maximum frames per video
         duration_filter: Filter by duration (short/medium/long)
         checkpoint_every: Save checkpoint every N samples
+        subset_fraction: Fraction of dataset to use (e.g., 0.33 for 1/3), sampled proportionally from each duration category
+        tensor_parallel_size: Number of GPUs for tensor parallelism (default: 1)
     """
     # Load annotations
     annotations = load_videomme_annotations(anno_path)
+    
+    # Apply subset sampling before duration filter (to maintain proportions)
+    if subset_fraction is not None:
+        # Group by duration category
+        by_duration = defaultdict(list)
+        for anno in annotations:
+            duration = anno.get('duration', 'unknown')
+            by_duration[duration].append(anno)
+        
+        # Sample from each duration category
+        sampled_annotations = []
+        for duration, items in by_duration.items():
+            n_sample = int(len(items) * subset_fraction)
+            sampled = items[:n_sample]  # Take first N items
+            sampled_annotations.extend(sampled)
+            logger.info(f"Sampled {n_sample}/{len(items)} from {duration} duration category")
+        
+        annotations = sampled_annotations
+        logger.info(f"Total after subset sampling: {len(annotations)} samples")
     
     # Filter by duration
     if duration_filter:
@@ -133,10 +156,12 @@ def evaluate_videomme(
     
     # Initialize vLLM agent
     logger.info("Initializing vLLM agent (this may take a few minutes)...")
+    logger.info(f"Using tensor parallelism across {tensor_parallel_size} GPU(s)")
     agent = QwenVideoAgentVLLM(
-        model_name="Qwen/Qwen2-VL-7B-Instruct",  # Use Qwen2-VL for vLLM
+        model_name="Qwen/Qwen3-VL-8B-Instruct",  # Use Qwen3-VL with vLLM >= 0.11.0
         cache_dir=cache_dir,
-        gpu_memory_utilization=0.75  # Lower to fit in available memory
+        tensor_parallel_size=tensor_parallel_size,
+        gpu_memory_utilization=0.85,  # Can use more with tensor parallelism
     )
     
     # Process in batches
@@ -216,6 +241,8 @@ def evaluate_videomme(
             'batch_size': batch_size,
             'max_frames': max_frames,
             'duration_filter': duration_filter,
+            'subset_fraction': subset_fraction,
+            'tensor_parallel_size': tensor_parallel_size,
             'total_samples': len(all_results)
         }
     }
@@ -315,6 +342,8 @@ def main():
     parser.add_argument("--max_frames", type=int, default=6, help="Max frames per video")
     parser.add_argument("--duration", choices=VIDEO_TYPES, help="Filter by duration")
     parser.add_argument("--checkpoint_every", type=int, default=100, help="Checkpoint frequency")
+    parser.add_argument("--subset", type=float, help="Use subset of dataset (e.g., 0.33 for 1/3), sampled proportionally from each duration category")
+    parser.add_argument("--tensor_parallel_size", type=int, default=1, help="Number of GPUs for tensor parallelism (e.g., 8 for 8 GPUs)")
     
     args = parser.parse_args()
     
@@ -327,7 +356,9 @@ def main():
         max_samples=args.max_samples,
         max_frames=args.max_frames,
         duration_filter=args.duration,
-        checkpoint_every=args.checkpoint_every
+        checkpoint_every=args.checkpoint_every,
+        subset_fraction=args.subset,
+        tensor_parallel_size=args.tensor_parallel_size
     )
 
 
